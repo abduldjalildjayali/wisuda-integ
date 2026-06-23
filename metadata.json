@@ -1,0 +1,6 @@
+{
+  "name": "Graduation Attendance Tracker",
+  "description": "Sistem pelacakan kehadiran wisudawan dan denah kursi real-time terintegrasi Google Sheets untuk Panitia Tamu dan tim AV.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
