@@ -26,94 +26,180 @@ export default function SeatingChart({ graduates, onTogglePresence, interactive 
     setHoveredSeat(null);
   };
 
-  // Group graduates by Row and Seat Number
-  const { rowKeys, colKeys, seatingGrid } = useMemo(() => {
-    const grid: Record<string, Record<string, Graduate>> = {};
-    const rows = new Set<string>();
-    const cols = new Set<number>();
-
+  // Map graduates by their parsed seat number for easy O(1) lookups
+  const seatMap = useMemo(() => {
+    const map: Record<number, Graduate> = {};
     graduates.forEach((grad) => {
-      const cleanCode = grad.seatCode.trim();
-      let row = "Misc";
-      let colNum = 1;
-
-      if (/^\d+$/.test(cleanCode)) {
-        // Purely numeric, e.g. "001" or "12"
-        const num = parseInt(cleanCode, 10);
-        if (!isNaN(num) && num > 0) {
-          row = `Baris ${Math.floor((num - 1) / 10) + 1}`;
-          colNum = ((num - 1) % 10) + 1;
-        }
-      } else {
-        // Alphanumeric, e.g. "A-01", "A01", "VIP-12"
-        const parts = cleanCode.split("-");
-        if (parts.length === 2) {
-          row = parts[0];
-          colNum = parseInt(parts[1], 10) || 1;
-        } else {
-          const match = cleanCode.match(/^([A-Za-z]+)(\d+)$/);
-          if (match) {
-            row = match[1].toUpperCase();
-            colNum = parseInt(match[2], 10) || 1;
-          } else {
-            // Fallback
-            row = "Misc";
-            colNum = 1;
-          }
-        }
+      const clean = grad.seatCode.trim();
+      const num = parseInt(clean, 10);
+      if (!isNaN(num)) {
+        map[num] = grad;
       }
-
-      rows.add(row);
-      cols.add(colNum);
-
-      if (!grid[row]) grid[row] = {};
-      grid[row][colNum] = grad;
     });
-
-    const getRowScore = (rowName: string): number => {
-      if (rowName.startsWith("Baris ")) {
-        const numPart = parseInt(rowName.replace("Baris ", ""), 10);
-        if (!isNaN(numPart)) return numPart;
-      }
-      return rowName.charCodeAt(0) + 1000;
-    };
-
-    const sortedRows = Array.from(rows).sort((a, b) => getRowScore(a) - getRowScore(b));
-    const sortedCols = Array.from(cols).sort((a, b) => a - b);
-
-    return {
-      rowKeys: sortedRows,
-      colKeys: sortedCols,
-      seatingGrid: grid,
-    };
+    return map;
   }, [graduates]);
+
+  // Determine the maximum seat number to dynamically draw extra rows for the left section
+  const maxSeatNum = useMemo(() => {
+    let max = 65; // default minimum
+    graduates.forEach((g) => {
+      const num = parseInt(g.seatCode, 10);
+      if (!isNaN(num) && num > max) {
+        max = num;
+      }
+    });
+    return max;
+  }, [graduates]);
+
+  // Generate left section rows (seats >= 28)
+  const leftRows = useMemo(() => {
+    const rows: (number | null)[][] = [];
+    
+    // Row 1 (Blue VIP/Cumlaude): [06, null, 05, null, 04] from left to right (Col 5, 4, 3, 2, 1)
+    rows.push([6, null, 5, null, 4]);
+    
+    // Row 2 and onwards are Yellow, starting from 28
+    let currentSeat = 28;
+    while (currentSeat <= maxSeatNum) {
+      const rowSeats: (number | null)[] = [];
+      // Col 5, 4, 3, 2, 1 from left to right (decremental offset so currentSeat is far right/Col 1)
+      for (let c = 4; c >= 0; c--) {
+        const seatNum = currentSeat + c;
+        if (seatNum <= maxSeatNum) {
+          rowSeats.push(seatNum);
+        } else {
+          rowSeats.push(null);
+        }
+      }
+      rows.push(rowSeats);
+      currentSeat += 5;
+    }
+    return rows;
+  }, [maxSeatNum]);
+
+  // Fixed Right section rows (seats 1-3 VIP Blue, and 7-27 Red)
+  const rightRows: (number | null)[][] = [
+    [3, null, 2, null, 1], // Row 1 (Blue VIP/Cumlaude)
+    [11, 10, 9, 8, 7],     // Row 2 (Red Teknik)
+    [16, 15, 14, 13, 12],  // Row 3 (Red Teknik)
+    [21, 20, 19, 18, 17],  // Row 4 (Red Teknik)
+    [26, 25, 24, 23, 22],  // Row 5 (Red Teknik)
+    [null, null, null, null, 27] // Row 6 (Red Teknik, 27 at far right Col 1)
+  ];
 
   const handleSeatClick = (grad: Graduate) => {
     setSelectedSeat(grad);
   };
 
+  const renderSeat = (seatNum: number | null, section: "left" | "right") => {
+    if (seatNum === null) {
+      return <div key={Math.random()} className="h-11 w-11 shrink-0" />;
+    }
+
+    const grad = seatMap[seatNum];
+    const paddedSeatCode = seatNum.toString().padStart(3, "0");
+
+    // Determine seat theme color
+    let type: "blue" | "red" | "yellow" = "yellow";
+    if (seatNum >= 1 && seatNum <= 6) {
+      type = "blue";
+    } else if (seatNum >= 7 && seatNum <= 27) {
+      type = "red";
+    }
+
+    if (!grad) {
+      // Empty physical seat with matching outline color
+      let emptyStyle = "";
+      if (type === "blue") {
+        emptyStyle = "border-indigo-200 bg-indigo-50/10 text-indigo-400";
+      } else if (type === "red") {
+        emptyStyle = "border-rose-200 bg-rose-50/10 text-rose-400";
+      } else {
+        emptyStyle = "border-amber-200 bg-amber-50/10 text-amber-400";
+      }
+
+      return (
+        <div
+          key={seatNum}
+          className={`h-11 w-11 border border-dashed rounded-xl flex items-center justify-center text-[9px] font-mono font-semibold shrink-0 select-none ${emptyStyle}`}
+          title={`Kursi ${paddedSeatCode} Kosong / Belum Terdaftar`}
+        >
+          {paddedSeatCode}
+        </div>
+      );
+    }
+
+    // Active button styles
+    let seatStyle = "";
+    if (grad.isPresent) {
+      if (type === "blue") {
+        seatStyle = "bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-500/30 hover:bg-indigo-500 scale-[1.05]";
+      } else if (type === "red") {
+        seatStyle = "bg-rose-600 border-rose-600 text-white ring-4 ring-rose-500/30 hover:bg-rose-500 scale-[1.05]";
+      } else {
+        seatStyle = "bg-amber-500 border-amber-500 text-white ring-4 ring-amber-500/30 hover:bg-amber-400 scale-[1.05]";
+      }
+    } else {
+      if (type === "blue") {
+        seatStyle = "bg-indigo-50/50 border border-indigo-400 text-indigo-800 hover:bg-indigo-100/50";
+      } else if (type === "red") {
+        seatStyle = "bg-rose-50/50 border border-rose-400 text-rose-800 hover:bg-rose-100/50";
+      } else {
+        seatStyle = "bg-amber-50/50 border border-amber-400 text-amber-800 hover:bg-amber-100/50";
+      }
+    }
+
+    return (
+      <button
+        key={seatNum}
+        onClick={() => handleSeatClick(grad)}
+        onMouseEnter={(e) => handleMouseEnter(grad, e)}
+        onMouseLeave={handleMouseLeave}
+        className={`h-11 w-11 rounded-xl transition-all duration-200 relative flex flex-col items-center justify-center font-mono text-[9px] cursor-pointer shadow-sm shrink-0 border ${seatStyle}`}
+        id={`seat-btn-${grad.id}`}
+      >
+        <span className="block font-bold leading-none">{paddedSeatCode}</span>
+        {grad.isPresent && (
+          <span className="text-[8px] font-sans font-bold truncate w-full px-0.5 text-center leading-none mt-0.5 text-white/95">
+            {grad.name.split(" ").slice(0, 2).map((n) => n[0]).join("")}
+          </span>
+        )}
+      </button>
+    );
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm w-full" id="seating-chart-container">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-slate-100 pb-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 border-b border-slate-100 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 font-sans flex items-center gap-2">
+          <h2 className="text-xl font-bold text-slate-800 font-sans flex flex-wrap items-center gap-2">
             Denah Kursi Wisudawan
             <span className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 font-bold font-mono rounded-full border border-blue-100">
-              Panggung Depan ↓
+              Panggung Depan ↑
             </span>
           </h2>
-          <p className="text-xs text-slate-500 mt-1">Representasi denah kursi di dalam gedung wisuda secara real-time.</p>
+          <p className="text-xs text-slate-500 mt-1">
+            Tata letak kursi sesuai nomor urut dimulai dari depan (Cumlaude) ke belakang.
+          </p>
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center gap-4 text-xs font-bold uppercase text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded bg-emerald-500 shadow-sm"></span>
-            <span>Hadir</span>
+        {/* Custom High-Fidelity Legend */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-bold uppercase text-slate-500">
+          <div className="flex items-center gap-2">
+            <span className="w-3.5 h-3.5 rounded bg-indigo-50 border border-indigo-400"></span>
+            <span>VIP / Baris 1</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded bg-slate-100 border border-slate-200"></span>
-            <span>Belum Hadir</span>
+          <div className="flex items-center gap-2">
+            <span className="w-3.5 h-3.5 rounded bg-rose-50 border border-rose-400"></span>
+            <span>Kanan (Teknik)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3.5 h-3.5 rounded bg-amber-50 border border-amber-400"></span>
+            <span>Kiri (Informatika)</span>
+          </div>
+          <div className="flex items-center gap-2 border-l border-slate-200 pl-4">
+            <span className="w-3.5 h-3.5 rounded bg-slate-700 ring-2 ring-slate-400/50"></span>
+            <span>Hadir (Glow)</span>
           </div>
         </div>
       </div>
@@ -123,74 +209,66 @@ export default function SeatingChart({ graduates, onTogglePresence, interactive 
         === AREA PANGGUNG UTAMA / DEPAN ===
       </div>
 
-      {/* Responsive Grid container with horizontal scrolling on small screens */}
+      {/* Responsive Grid container with horizontal scrolling */}
       <div className="overflow-x-auto pb-4 custom-scrollbar">
-        <div className="min-w-[650px] flex flex-col gap-3">
-          {rowKeys.map((row) => (
-            <div key={row} className="flex items-center gap-2">
-              {/* Row Label (Left) */}
-              <div className="px-3 h-10 flex items-center justify-center bg-slate-100 text-slate-800 font-bold font-mono border border-slate-200 rounded-xl text-xs shadow-sm shrink-0 min-w-[70px]">
-                {row}
-              </div>
-
-              {/* Seats in Row */}
-              <div className="flex-1 grid grid-cols-10 gap-2 p-2 bg-slate-50/50 rounded-2xl border border-slate-100">
-                {colKeys.map((col) => {
-                  const grad = seatingGrid[row]?.[col];
-                  const rowNum = row.startsWith("Baris ") ? parseInt(row.replace("Baris ", ""), 10) : NaN;
-                  const calculatedSeatCode = !isNaN(rowNum) 
-                    ? ((rowNum - 1) * 10 + col).toString().padStart(3, "0")
-                    : `${row}-${col.toString().padStart(2, "0")}`;
-
-                  if (!grad) {
-                    // Empty seat
-                    return (
-                      <div
-                        key={col}
-                        className="h-10 border border-dashed border-slate-200 bg-slate-100/50 rounded-xl flex items-center justify-center text-[10px] text-slate-400 font-mono font-semibold"
-                        title={`Kursi ${calculatedSeatCode} Kosong`}
-                      >
-                        {calculatedSeatCode}
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <button
-                      key={col}
-                      onClick={() => handleSeatClick(grad)}
-                      onMouseEnter={(e) => handleMouseEnter(grad, e)}
-                      onMouseLeave={handleMouseLeave}
-                      className={`h-10 rounded-xl transition-all duration-200 relative flex flex-col items-center justify-center font-mono text-xs cursor-pointer shadow-sm
-                        ${
-                          grad.isPresent
-                            ? "bg-emerald-500 text-white font-bold ring-2 ring-emerald-500/20 hover:bg-emerald-400 scale-[1.02]"
-                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
-                        }
-                      `}
-                      id={`seat-btn-${grad.id}`}
-                    >
-                      {/* Seat Code */}
-                      <span className={`text-[10px] block font-semibold ${grad.isPresent ? "text-white/80" : "text-slate-400"}`}>
-                        {grad.seatCode}
-                      </span>
-                      {/* Initials of Graduate if present */}
-                      <span className="text-[10px] font-sans truncate w-full px-1 text-center font-bold">
-                        {grad.isPresent
-                          ? grad.name.split(" ").slice(0, 2).map((n) => n[0]).join("")
-                          : ""}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Row Label (Right) */}
-              <div className="px-3 h-10 flex items-center justify-center bg-slate-100 text-slate-800 font-bold font-mono border border-slate-200 rounded-xl text-xs shadow-sm shrink-0 min-w-[70px]">
-                {row}
-              </div>
+        <div className="min-w-[700px] flex justify-center items-start gap-3 p-4 bg-slate-50/30 rounded-3xl border border-slate-100">
+          
+          {/* SISI KIRI (Informatika - Yellow Block) */}
+          <div className="flex flex-col items-center">
+            <div className="text-center mb-3">
+              <span className="text-xs font-bold text-amber-800 font-sans tracking-wide uppercase px-3 py-1 bg-amber-50 border border-amber-200/50 rounded-full block">
+                Sisi Kiri (Informatika)
+              </span>
+              <span className="text-[10px] text-slate-400 mt-1 block">Baris 2+ (NPM 028 seterusnya)</span>
             </div>
-          ))}
+            
+            <div className="flex flex-col gap-2.5">
+              {leftRows.map((row, rIdx) => (
+                <React.Fragment key={`left-row-fragment-${rIdx}`}>
+                  <div className="grid grid-cols-5 gap-2.5 p-2 bg-white rounded-2xl border border-slate-200/60 shadow-sm">
+                    {row.map((seatNum) => renderSeat(seatNum, "left"))}
+                  </div>
+                  
+                  {/* Gang Mendatar (Horizontal Aisle) after Yellow Row 4 (leftRows index 4) */}
+                  {rIdx === 4 && (
+                    <div className="w-full flex items-center justify-center py-2 bg-slate-200/60 border border-slate-300/40 rounded-xl my-1 shadow-inner select-none">
+                      <span className="text-[9px] font-bold text-slate-500 font-mono tracking-[0.25em] uppercase">
+                        GANG MENDATAR
+                      </span>
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          {/* JALAN TENGAH (Central Aisle Divider) */}
+          <div className="w-12 bg-slate-200/80 border-x border-slate-300/50 rounded-2xl py-8 shrink-0 flex flex-col items-center justify-stretch self-stretch relative min-h-[420px] shadow-inner select-none">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-[10px] font-black text-slate-500 font-mono tracking-[0.4em] uppercase rotate-90 whitespace-nowrap">
+                JALAN TENGAH
+              </span>
+            </div>
+          </div>
+
+          {/* SISI KANAN (Teknik - Red Block) */}
+          <div className="flex flex-col items-center">
+            <div className="text-center mb-3">
+              <span className="text-xs font-bold text-rose-800 font-sans tracking-wide uppercase px-3 py-1 bg-rose-50 border border-rose-200/50 rounded-full block">
+                Sisi Kanan (Teknik)
+              </span>
+              <span className="text-[10px] text-slate-400 mt-1 block">Baris 2+ (NPM 007 - 027)</span>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              {rightRows.map((row, rIdx) => (
+                <div key={`right-row-${rIdx}`} className="grid grid-cols-5 gap-2.5 p-2 bg-white rounded-2xl border border-slate-200/60 shadow-sm">
+                  {row.map((seatNum) => renderSeat(seatNum, "right"))}
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
 
