@@ -24,6 +24,11 @@ export default function AVPanel({ graduates, logs, universityName = "Institut Te
     return { total, present, absent, percentage };
   }, [graduates]);
 
+  const activeGraduate = React.useMemo(() => {
+    if (!lastAnnouncedLog) return null;
+    return graduates.find((g) => g.id === lastAnnouncedLog.graduateId);
+  }, [lastAnnouncedLog, graduates]);
+
   // Handle live announcement of newly arrived graduates
   useEffect(() => {
     if (logs.length > 0) {
@@ -217,15 +222,26 @@ export default function AVPanel({ graduates, logs, universityName = "Institut Te
             </div>
 
             <span className="text-xs font-mono text-amber-400 uppercase tracking-[0.25em] font-bold block mb-2">
-              ✨ SELAMAT DATANG WISUDAWAN ✨
+              ✨ SELAMAT DATANG ✨
             </span>
             
             <h2 className="text-4xl font-extrabold text-white leading-tight font-sans tracking-tight mb-2">
               {lastAnnouncedLog.graduateName}
             </h2>
 
+            {/* Parents detail */}
+            {activeGraduate && (activeGraduate.ayah || activeGraduate.ibu) ? (
+              <p className="text-lg text-amber-200 font-sans font-medium tracking-wide mb-6 mt-1">
+                Beserta Orang Tua: <span className="font-extrabold text-white">{[activeGraduate.ayah, activeGraduate.ibu].filter(Boolean).join(" & ")}</span>
+              </p>
+            ) : (
+              <p className="text-lg text-amber-200 font-sans font-medium tracking-wide mb-6 mt-1">
+                Beserta Orang Tua
+              </p>
+            )}
+
             {/* Sub details */}
-            <p className="text-base text-slate-400 font-mono mb-6">
+            <p className="text-sm text-slate-400 font-mono mb-6">
               NIM: {lastAnnouncedLog.graduateId}
             </p>
 

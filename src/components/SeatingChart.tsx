@@ -87,8 +87,82 @@ export default function SeatingChart({ graduates, onTogglePresence, interactive 
     [null, null, null, null, 27] // Row 6 (Red Teknik, 27 at far right Col 1)
   ];
 
+  // Generate Parent row arrays (5 items per row, 13 rows total)
+  const parentRows = useMemo(() => {
+    const rows: number[][] = [];
+    for (let r = 0; r < 13; r++) {
+      const rowSeats: number[] = [];
+      for (let c = 1; c <= 5; c++) {
+        rowSeats.push(r * 5 + c);
+      }
+      rows.push(rowSeats);
+    }
+    return rows;
+  }, []);
+
   const handleSeatClick = (grad: Graduate) => {
     setSelectedSeat(grad);
+  };
+
+  const renderParentPair = (seatNum: number) => {
+    const grad = seatMap[seatNum];
+    const isPresent = grad?.isPresent || false;
+    const paddedNum = seatNum.toString().padStart(2, "0");
+    
+    return (
+      <div key={`parent-pair-${seatNum}`} className="flex flex-col items-center gap-1 p-1 bg-slate-50 border border-slate-200/60 rounded-xl shadow-xs shrink-0 w-14">
+        <span className={`text-[9px] font-mono font-black ${isPresent ? "text-emerald-600 font-extrabold" : "text-slate-400"}`}>
+          {paddedNum}
+        </span>
+        <div className="flex gap-1 justify-center">
+          {/* Father seat */}
+          <div 
+            className={`w-3.5 h-3.5 rounded-md transition-all duration-300 border ${
+              isPresent 
+                ? "bg-emerald-500 border-emerald-400 ring-2 ring-emerald-400/30 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" 
+                : "bg-slate-700 border-slate-600"
+            }`}
+            title={`Kursi Orang Tua Ayah ${paddedNum} (${isPresent ? "Hadir" : "Belum Hadir"})`}
+          />
+          {/* Mother seat */}
+          <div 
+            className={`w-3.5 h-3.5 rounded-md transition-all duration-300 border ${
+              isPresent 
+                ? "bg-emerald-500 border-emerald-400 ring-2 ring-emerald-400/30 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" 
+                : "bg-slate-700 border-slate-600"
+            }`}
+            title={`Kursi Orang Tua Ibu ${paddedNum} (${isPresent ? "Hadir" : "Belum Hadir"})`}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const renderParentRow = (rowSeats: number[]) => {
+    return (
+      <div className="flex items-center gap-1.5">
+        {/* Col 1 */}
+        {renderParentPair(rowSeats[0])}
+        
+        {/* Vertical Aisle 1 */}
+        <div className="w-1 self-stretch bg-slate-200/50 rounded-full" />
+        
+        {/* Cols 2 & 3 */}
+        <div className="flex gap-1.5">
+          {renderParentPair(rowSeats[1])}
+          {renderParentPair(rowSeats[2])}
+        </div>
+        
+        {/* Vertical Aisle 2 */}
+        <div className="w-1 self-stretch bg-slate-200/50 rounded-full" />
+        
+        {/* Cols 4 & 5 */}
+        <div className="flex gap-1.5">
+          {renderParentPair(rowSeats[3])}
+          {renderParentPair(rowSeats[4])}
+        </div>
+      </div>
+    );
   };
 
   const renderSeat = (seatNum: number | null, section: "left" | "right") => {
@@ -211,8 +285,51 @@ export default function SeatingChart({ graduates, onTogglePresence, interactive 
 
       {/* Responsive Grid container with horizontal scrolling */}
       <div className="overflow-x-auto pb-4 custom-scrollbar">
-        <div className="min-w-[700px] flex justify-center items-start gap-3 p-4 bg-slate-50/30 rounded-3xl border border-slate-100">
+        <div className="min-w-[1050px] flex justify-center items-start gap-4 p-4 bg-slate-50/30 rounded-3xl border border-slate-100">
           
+          {/* SISI ORANG TUA (Left Section) */}
+          <div className="flex flex-col items-center">
+            <div className="text-center mb-3">
+              <span className="text-xs font-bold text-slate-800 font-sans tracking-wide uppercase px-3 py-1 bg-slate-100 border border-slate-200 rounded-full block">
+                Orang Tua Wisudawan
+              </span>
+              <span className="text-[10px] text-slate-400 mt-1 block">Pasangan Kursi (Sesuai No. Wisudawan)</span>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              {parentRows.map((row, rIdx) => (
+                <React.Fragment key={`parent-row-fragment-${rIdx}`}>
+                  {renderParentRow(row)}
+                  
+                  {/* Gang Mendatar (Horizontal Aisle for Parents) */}
+                  {rIdx === 4 && (
+                    <div className="w-full flex items-center justify-center py-2 bg-slate-200/50 border border-slate-300/30 rounded-xl my-1 select-none">
+                      <span className="text-[8px] font-bold text-slate-500 font-mono tracking-[0.2em] uppercase">
+                        LORONG
+                      </span>
+                    </div>
+                  )}
+                  {rIdx === 9 && (
+                    <div className="w-full flex items-center justify-center py-2 bg-slate-200/50 border border-slate-300/30 rounded-xl my-1 select-none">
+                      <span className="text-[8px] font-bold text-slate-500 font-mono tracking-[0.2em] uppercase">
+                        LORONG
+                      </span>
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          {/* LORONG UTAMA (Divider between Parents & Students) */}
+          <div className="w-10 bg-slate-200/60 border-x border-slate-300/40 rounded-2xl py-8 shrink-0 flex flex-col items-center justify-stretch self-stretch relative min-h-[420px] shadow-inner select-none">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-[10px] font-black text-slate-500 font-mono tracking-[0.4em] uppercase rotate-90 whitespace-nowrap">
+                LORONG UTAMA
+              </span>
+            </div>
+          </div>
+
           {/* SISI KIRI (Informatika - Yellow Block) */}
           <div className="flex flex-col items-center">
             <div className="text-center mb-3">
