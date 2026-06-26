@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Award, Sparkles, Tv, Volume2, ShieldCheck, Heart, X } from "lucide-react";
 import { Graduate, ActivityLog } from "../types";
 import SeatingChart from "./SeatingChart";
+import { getGoogleDriveDirectLink } from "../utils/drive";
 
 interface AVPanelProps {
   graduates: Graduate[];
@@ -60,9 +61,13 @@ export default function AVPanel({ graduates, logs, universityName = "Institut Te
 
   // Keep track of the last 10 check-ins for the bottom scrolling ticker
   useEffect(() => {
-    const checkInsOnly = logs.filter(log => log.action === "check-in").slice(0, 10);
+    const checkInsOnly = logs.filter(log => {
+      if (log.action !== "check-in") return false;
+      const grad = graduates.find(g => g.id === log.graduateId);
+      return grad ? grad.isPresent : false;
+    }).slice(0, 10);
     setTickerLogs(checkInsOnly);
-  }, [logs]);
+  }, [logs, graduates]);
 
   return (
     <div className="bg-slate-100 min-h-screen text-slate-800 p-6 relative flex flex-col gap-6" id="av-panel-container">
@@ -207,18 +212,47 @@ export default function AVPanel({ graduates, logs, universityName = "Institut Te
               <X size={18} />
             </button>
             
-            {/* Top Badge Icons */}
+            {/* Photo / Logo Area */}
             <div className="flex justify-center mb-6">
-              <div className="relative">
-                <div className="absolute inset-0 bg-amber-500 rounded-full blur-xl opacity-30 animate-ping"></div>
-                <div className="p-5 bg-gradient-to-b from-amber-400 to-amber-600 rounded-full text-slate-950 relative shadow-2xl w-24 h-24 flex items-center justify-center overflow-hidden">
-                  {campusLogo ? (
-                    <img src={campusLogo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                  ) : (
-                    <Award size={48} className="stroke-[2]" />
-                  )}
+              {activeGraduate?.foto ? (
+                <div className="relative">
+                  {/* Decorative glowing backplate */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-amber-500 to-indigo-500 rounded-3xl blur-2xl opacity-40 animate-pulse"></div>
+                  
+                  {/* Outer double border border container */}
+                  <div className="relative p-1.5 bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 rounded-3xl shadow-2xl">
+                    <div className="w-40 h-52 rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center border border-slate-900">
+                      <img 
+                        src={getGoogleDriveDirectLink(activeGraduate.foto)} 
+                        alt={activeGraduate.name} 
+                        className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500" 
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          // Fallback if image fails to load
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    {/* Small badge of university logo overlapping at bottom-right */}
+                    {campusLogo && (
+                      <div className="absolute -bottom-2 -right-2 w-10 h-10 p-1.5 bg-slate-900 border-2 border-amber-400 rounded-full shadow-lg flex items-center justify-center overflow-hidden">
+                        <img src={campusLogo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="relative">
+                  <div className="absolute inset-0 bg-amber-500 rounded-full blur-xl opacity-30 animate-ping"></div>
+                  <div className="p-5 bg-gradient-to-b from-amber-400 to-amber-600 rounded-full text-slate-950 relative shadow-2xl w-24 h-24 flex items-center justify-center overflow-hidden">
+                    {campusLogo ? (
+                      <img src={campusLogo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                    ) : (
+                      <Award size={48} className="stroke-[2]" />
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <span className="text-xs font-mono text-amber-400 uppercase tracking-[0.25em] font-bold block mb-2">

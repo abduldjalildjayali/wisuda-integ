@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Graduate } from "../types";
 import { Search, Info, CheckCircle2, XCircle } from "lucide-react";
+import { getGoogleDriveDirectLink } from "../utils/drive";
 
 interface SeatingChartProps {
   graduates: Graduate[];
@@ -407,16 +408,45 @@ export default function SeatingChart({ graduates, onTogglePresence, interactive 
 
             <div className="flex flex-col items-center mt-2">
               {/* Avatar Indicator */}
-              <div
-                className={`w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold mb-4 border-2 shadow-sm
-                  ${
-                    selectedSeat.isPresent
-                      ? "bg-emerald-500 border-emerald-500 text-white ring-4 ring-emerald-500/20"
-                      : "bg-slate-100 border-slate-200 text-slate-600"
-                  }
-                `}
-              >
-                {selectedSeat.seatCode}
+              {/* Photo or Initials Bubble */}
+              <div className="relative mb-4 flex justify-center">
+                {selectedSeat.foto ? (
+                  <div className="relative">
+                    <div className="w-24 h-32 rounded-2xl overflow-hidden border-2 border-slate-200 shadow-sm bg-slate-50">
+                      <img 
+                        src={getGoogleDriveDirectLink(selectedSeat.foto)} 
+                        alt={selectedSeat.name} 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    {/* Seat code as a badge at the bottom-right corner of the photo */}
+                    <div className={`absolute -bottom-1 -right-1 px-2.5 py-1 text-white font-mono font-bold rounded-lg text-[10px] shadow-sm border
+                      ${
+                        selectedSeat.isPresent
+                          ? "bg-emerald-600 border-emerald-500"
+                          : "bg-slate-700 border-slate-600"
+                      }
+                    `}>
+                      Kursi {selectedSeat.seatCode}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className={`w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold border-2 shadow-sm
+                      ${
+                        selectedSeat.isPresent
+                          ? "bg-emerald-500 border-emerald-500 text-white ring-4 ring-emerald-500/20"
+                          : "bg-slate-100 border-slate-200 text-slate-600"
+                      }
+                    `}
+                  >
+                    {selectedSeat.seatCode}
+                  </div>
+                )}
               </div>
 
               <h3 className="text-lg font-bold text-slate-950 font-sans text-center">{selectedSeat.name}</h3>
@@ -519,24 +549,39 @@ export default function SeatingChart({ graduates, onTogglePresence, interactive 
             left: `${tooltipPos.left}px`,
             transform: "translate(-50%, -100%)"
           }}
-          className="bg-slate-900 text-white text-[11px] rounded-2xl p-4 shadow-2xl z-50 w-64 text-left leading-relaxed border border-slate-800 pointer-events-none animate-fade-in space-y-1"
+          className="bg-slate-900 text-white text-[11px] rounded-2xl p-4 shadow-2xl z-50 w-[290px] text-left border border-slate-800 pointer-events-none animate-fade-in flex gap-3 items-start"
         >
-          <div className="font-bold font-sans text-blue-400 mb-0.5 truncate">{hoveredSeat.name}</div>
-          <div className="text-slate-300 font-mono">NPM: {hoveredSeat.nim}</div>
-          <div className="text-slate-300 truncate">Prodi: {hoveredSeat.prodi}</div>
-          {hoveredSeat.ipk && (
-            <div className="text-amber-400 font-mono">IPK: {hoveredSeat.ipk} ({hoveredSeat.sks || "-"} SKS)</div>
+          {hoveredSeat.foto && (
+            <div className="w-16 h-20 rounded-xl overflow-hidden border border-slate-800 shrink-0 bg-slate-950 flex items-center justify-center shadow-md">
+              <img 
+                src={getGoogleDriveDirectLink(hoveredSeat.foto)} 
+                alt={hoveredSeat.name} 
+                className="w-full h-full object-cover" 
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
           )}
-          <div className="text-blue-300 font-mono font-bold">Kursi: {hoveredSeat.seatCode}</div>
-          <div className="mt-2 pt-2 border-t border-slate-800 flex items-center gap-1.5">
-            <span
-              className={`inline-block w-2 h-2 rounded-full ${
-                hoveredSeat.isPresent ? "bg-emerald-400 animate-pulse" : "bg-rose-400"
-              }`}
-            ></span>
-            <span className={hoveredSeat.isPresent ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-              {hoveredSeat.isPresent ? "Hadir" : "Belum Hadir"}
-            </span>
+          <div className="flex-1 min-w-0 space-y-0.5">
+            <div className="font-bold font-sans text-blue-400 mb-0.5 truncate">{hoveredSeat.name}</div>
+            <div className="text-slate-300 font-mono">NPM: {hoveredSeat.nim}</div>
+            <div className="text-slate-300 truncate">Prodi: {hoveredSeat.prodi}</div>
+            {hoveredSeat.ipk && (
+              <div className="text-amber-400 font-mono">IPK: {hoveredSeat.ipk} ({hoveredSeat.sks || "-"} SKS)</div>
+            )}
+            <div className="text-blue-300 font-mono font-bold">Kursi: {hoveredSeat.seatCode}</div>
+            <div className="mt-2 pt-2 border-t border-slate-800 flex items-center gap-1.5">
+              <span
+                className={`inline-block w-2 h-2 rounded-full ${
+                  hoveredSeat.isPresent ? "bg-emerald-400 animate-pulse" : "bg-rose-400"
+                }`}
+              ></span>
+              <span className={hoveredSeat.isPresent ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                {hoveredSeat.isPresent ? "Hadir" : "Belum Hadir"}
+              </span>
+            </div>
           </div>
         </div>
       )}
